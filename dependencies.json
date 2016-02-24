@@ -1,0 +1,13 @@
+{
+  "repositories": [
+    {
+      "name": "skymine",
+      "url": "http://nexus.sky-mine.ru:8081/nexus/content/repositories/1/",
+      "login": "${NEXUS_PASSWORD}",
+      "password": "${NEXUS_LOGIN}"
+    }
+  ],
+  "dependencies": [
+    "ru.redenergy.rebin:rebin:jar:dev:v1.0.0b3"
+  ]
+}
