@@ -20,6 +20,7 @@ dependencies {
     compile "org.eclipse.aether:aether-transport-file:$aetherVersion"
     compile 'org.slf4j:slf4j-api:1.7.16'
     compile 'org.slf4j:slf4j-simple:1.7.16'
+    compile 'commons-io:commons-io:2.4'
 }
 
 jar{
