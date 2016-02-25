@@ -15,20 +15,27 @@ import ru.redenergy.resolver.config.Dependencies;
 import ru.redenergy.resolver.maven.MavenProvider;
 
 import java.io.*;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class Resolver {
 
+    private static final String mainConfigFile = System.getProperty("mainConfig", "dependencies.json");
+    private static final String deployFolder = System.getProperty("deployPath", "mods/");
+
     private Dependencies mainConfig;
 
-    public void launch(String[] args) throws IOException, DependencyResolutionException {
-        loadMainConfig(new File("dependencies.json"));
+    public void launch() throws IOException, DependencyResolutionException {
+        loadMainConfig(new File(mainConfigFile));
         processDependencies(mainConfig);
-        loadModsDeps(new File("mods/"));
+        loadModsDeps(new File(deployFolder));
     }
 
     private void loadMainConfig(File file) throws FileNotFoundException {
@@ -46,18 +53,22 @@ public class Resolver {
             for (String art : dependencies.getDependencies()) {
                 Artifact artifact = new DefaultArtifact(extractPossibleEnv(art));
                 List<ArtifactResult> results = MavenProvider.instance().resolveTransitively(artifact);
-                for(ArtifactResult result : results){
-                    if(result.getArtifact().getFile() != null){
-                        Path from = Paths.get(result.getArtifact().getFile().toURI());
-                        Path to = Paths.get("mods/", result.getArtifact().getFile().getName());
-                        try {
-                            Files.copy(from, to);
-                        } catch (FileAlreadyExistsException ex) {}
-                    }
-                }
+                deployArtifacts(results);
             }
         }
     }
+
+    private void deployArtifacts(List<ArtifactResult> artifacts) throws IOException {
+        Paths.get(deployFolder).toFile().mkdir();
+        List<ArtifactResult> deployable = artifacts.stream().filter(it -> it.getArtifact().getFile() != null && it.getArtifact().getFile().exists()).collect(Collectors.toList());
+        for(ArtifactResult result : deployable){
+            Path from = result.getArtifact().getFile().toPath();
+            Path to = Paths.get(deployFolder).resolve(result.getArtifact().getFile().getName());
+            Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println(result.getArtifact() + " resolved");
+        }
+    }
+
 
     private void loadModsDeps(File modsFolder) throws IOException, DependencyResolutionException {
         List<Dependencies> dependenciesList = new ArrayList<>();
@@ -67,17 +78,22 @@ public class Resolver {
                 ZipEntry entry = zip.getEntry("mcmod.info");
                 if(entry == null) continue;
                 BufferedReader reader = new BufferedReader(new InputStreamReader(zip.getInputStream(entry), "UTF-8"));
-                JsonElement json = new JsonParser().parse(new JsonReader(reader));
-                for(JsonElement jsonElement : json.getAsJsonArray()){
-                    JsonElement maven = jsonElement.getAsJsonObject().getAsJsonObject("maven");
-                    if(maven != null) {
-                        Dependencies dependencies = new Gson().fromJson(maven, Dependencies.class);
-                        dependenciesList.add(dependencies);
-                    }
-                }
+                Dependencies dependencies = parseDependenciesMeta(new JsonReader(reader));
+                if(dependencies != null) dependenciesList.add(dependencies);
             }
         }
         for(Dependencies dependencies: dependenciesList) processDependencies(dependencies);
+    }
+
+    private Dependencies parseDependenciesMeta(JsonReader reader){
+        JsonElement json = new JsonParser().parse(reader);
+        for(JsonElement jsonElement : json.getAsJsonArray()){
+            JsonElement maven = jsonElement.getAsJsonObject().getAsJsonObject("maven");
+            if(maven != null) {
+                return new Gson().fromJson(maven, Dependencies.class);
+            }
+        }
+        return null;
     }
 
     private RemoteRepository toRemote(Dependencies.Repository repository) {
@@ -107,7 +123,7 @@ public class Resolver {
     }
 
     public static void main(String[] args) throws IOException, DependencyResolutionException {
-        new Resolver().launch(args);
+        new Resolver().launch();
     }
 
 }
