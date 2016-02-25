@@ -6,6 +6,9 @@ repositories {
 
 def aetherVersion = "1.1.0"
 
+version = "v1.0.1"
+archivesBaseName = "resolver"
+
 dependencies {
     compile "com.google.code.gson:gson:2.6.1"
     compile "org.eclipse.aether:aether-api:$aetherVersion"
@@ -16,4 +19,12 @@ dependencies {
     compile "org.apache.maven:maven-aether-provider:3.3.9"
     compile "org.eclipse.aether:aether-transport-file:$aetherVersion"
     compile 'org.slf4j:slf4j-api:1.7.16'
+    compile 'org.slf4j:slf4j-simple:1.7.16'
+}
+
+jar{
+    manifest {
+        attributes 'Main-Class' : 'ru.redenergy.resolver.Resolver'
+    }
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it)}}
 }
