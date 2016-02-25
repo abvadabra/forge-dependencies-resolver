@@ -47,11 +47,16 @@ public class MavenProvider {
         session.setLocalRepositoryManager(system.newLocalRepositoryManager(session, new LocalRepository(REPO_PATH)));
     }
 
-    public List<ArtifactResult> resolveTransitively(Artifact artifact) throws DependencyResolutionException {
+    public List<ArtifactResult> resolveTransitively(Artifact artifact) {
         CollectRequest collectionRequest = new CollectRequest().setRoot(new Dependency(artifact, JavaScopes.COMPILE));
         repositoryList.forEach(collectionRequest::addRepository);
         DependencyRequest request = new DependencyRequest(collectionRequest, DependencyFilterUtils.classpathFilter(JavaScopes.COMPILE));
-        return system.resolveDependencies(session, request).getArtifactResults();
+        try {
+            return system.resolveDependencies(session, request).getArtifactResults();
+        } catch (DependencyResolutionException e) {
+            e.printStackTrace();
+        }
+        return new ArrayList<>();
     }
 
     public void addRepository(RemoteRepository repository){
