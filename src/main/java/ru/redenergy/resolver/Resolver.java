@@ -147,6 +147,7 @@ public class Resolver {
                 .filter(JsonElement::isJsonObject)
                 .map(JsonElement::getAsJsonObject)
                 .filter(it -> it.has("maven"))
+                .map(it -> it.getAsJsonObject("maven"))
                 .map(it -> gson.fromJson(it, Dependencies.class))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
