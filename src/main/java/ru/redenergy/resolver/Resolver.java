@@ -5,6 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonReader;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.Authentication;
@@ -12,26 +14,27 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
-import ru.redenergy.resolver.config.Dependencies;
+import ru.redenergy.resolver.domain.Dependencies;
 import ru.redenergy.resolver.config.ResolutionCache;
+import ru.redenergy.resolver.domain.Repository;
+import ru.redenergy.resolver.domain.ResolveDSLParser;
 import ru.redenergy.resolver.maven.MavenProvider;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 public class Resolver {
 
-    private static RemoteRepository cental = new RemoteRepository.Builder("central", "default", "http://repo1.maven.org/maven2/").build();
+    private static RemoteRepository central = new RemoteRepository.Builder("central", "default", "http://repo1.maven.org/maven2/").build();
 
-    private static final String mainConfigFile = System.getProperty("mainConfig", "dependencies.json");
+    private static final String mainConfigFile = System.getProperty("mainConfig", "dependencies.groovy");
     private static final String deployFolder = System.getProperty("deployPath", "mods/");
 
     private ResolutionCache oldCache;
@@ -40,7 +43,7 @@ public class Resolver {
     private List<Artifact> resolvedArtifacts = new ArrayList<>();
 
     public void launch() throws IOException, DependencyResolutionException {
-        MavenProvider.instance().addRepository(cental);
+        MavenProvider.instance().addRepository(central);
         parseMainConfig();
         parseSubmodules();
         resolveParsedArtifacts();
@@ -53,10 +56,8 @@ public class Resolver {
     }
 
     private void parseMainConfig() throws IOException {
-        JsonReader reader = new JsonReader(new FileReader(new File(mainConfigFile)));
-        Dependencies mainConfig = new Gson().fromJson(reader, Dependencies.class);
+        Dependencies mainConfig = (Dependencies) new ResolveDSLParser().shell().evaluate(new File(mainConfigFile));
         dependenciesList.add(mainConfig);
-        reader.close();
     }
 
     private void parseSubmodules() throws IOException {
@@ -64,14 +65,14 @@ public class Resolver {
         for(File module : new File(deployFolder).listFiles()){
             if(module.isFile() && module.getName().endsWith(".zip") || module.getName().endsWith(".jar")){
                 JarFile jar = new JarFile(module);
-                JarEntry modmeta = jar.getJarEntry("mcmod.info");
+                JarEntry modmeta = jar.getJarEntry("dependencies.groovy");
                 if(modmeta != null) {
                     InputStream entryStream = jar.getInputStream(modmeta);
-                    JsonReader reader = new JsonReader(new InputStreamReader(entryStream, "UTF-8"));
-                    List<Dependencies> dependencies = parseModMeta(reader);
+                    InputStreamReader streamReader = new InputStreamReader(entryStream, "UTF-8");
+                    Dependencies dependencies = (Dependencies) new ResolveDSLParser().shell().evaluate(streamReader);
+                    streamReader.close();
                     entryStream.close();
-                    reader.close();
-                    dependenciesList.addAll(dependencies);
+                    dependenciesList.add(dependencies);
                 }
                 jar.close();
             }
@@ -84,15 +85,45 @@ public class Resolver {
                 .flatMap(it -> it.getRepositories().stream())
                 .map(this::toRemote)
                 .forEach(MavenProvider.instance()::addRepository);
-        dependenciesList.parallelStream() //parallel because resolving transitively is heavy and long running task
+        List<Dependencies.Artifact> artifacts = dependenciesList.stream()
                 .filter(it -> it.getDependencies() != null)
                 .flatMap(it -> it.getDependencies().stream())
-                .map(DefaultArtifact::new)
-                .flatMap(it -> MavenProvider.instance().resolveTransitively(it).stream())
+                .collect(Collectors.toList());
+
+        List<Dependencies.Artifact> transitive = artifacts.stream().filter(Dependencies.Artifact::isTransitive).collect(Collectors.toList());
+        List<Dependencies.Artifact> nonTransitive = artifacts.stream().filter(it -> !it.isTransitive()).collect(Collectors.toList());
+
+        transitive.parallelStream()
+                .map(it -> Pair.of(it, new DefaultArtifact(it.getId())))
+                .map(it -> Pair.of(it.getLeft(), MavenProvider.instance().resolveTransitively(it.getRight())))
+                .flatMap(it -> it.getValue().stream()
+                        .filter(that -> !checkExcludes(it.getKey(), that))
+                        .collect(Collectors.toList()).stream())
                 .filter(it -> it.getArtifact() != null && it.getArtifact().getFile() != null)
                 .map(ArtifactResult::getArtifact)
                 .distinct()
                 .forEach(this.resolvedArtifacts::add);
+
+        nonTransitive.parallelStream()
+                .map(Dependencies.Artifact::getId)
+                .map(DefaultArtifact::new)
+                .map(MavenProvider.instance()::resolve)
+                .filter(it -> it.getArtifact().getFile() != null)
+                .map(ArtifactResult::getArtifact)
+                .distinct()
+                .forEach(this.resolvedArtifacts::add);
+    }
+
+    private boolean checkExcludes(Dependencies.Artifact artifactConfig, ArtifactResult resolvedArtifact) {
+        String[] excludes = artifactConfig.getExcludes();
+        if(excludes == null || resolvedArtifact.getArtifact() == null) return false;
+        Artifact resolved = resolvedArtifact.getArtifact();
+        boolean excluded = Stream.of(excludes)
+                .map(DefaultArtifact::new)
+                .anyMatch(it -> it.getGroupId().equalsIgnoreCase(resolved.getGroupId()) &&
+                        it.getArtifactId().equalsIgnoreCase(resolved.getArtifactId()) &&
+                        it.getClassifier().equalsIgnoreCase(resolved.getClassifier()));
+        return excluded;
     }
 
     private void generateNewCache() {
@@ -154,7 +185,7 @@ public class Resolver {
     }
 
 
-    private RemoteRepository toRemote(Dependencies.Repository repository) {
+    private RemoteRepository toRemote(Repository repository) {
         String name = extractPossibleEnv(repository.getName());
         String url = extractPossibleEnv(repository.getUrl());
         String login = extractPossibleEnv(repository.getLogin());
@@ -172,7 +203,7 @@ public class Resolver {
 
     private String extractPossibleEnv(String value) {
         if (value == null) return null;
-        boolean envVar = value.matches("\\$\\{.*\\}"); //if matches ${value}
+        boolean envVar = value.matches("#\\{.*\\}"); //if matches #{value}
         if (envVar) {
             String varName = value.substring(2, value.length() - 1);
             return System.getenv(varName);

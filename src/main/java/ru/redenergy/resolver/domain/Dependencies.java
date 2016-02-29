@@ -36,7 +36,7 @@ public class Dependencies {
     public static class Artifact {
         private String id;
         private String[] exclude;
-        private boolean transitive;
+        private boolean transitive = true;
 
         public String getId() {
             return id;
