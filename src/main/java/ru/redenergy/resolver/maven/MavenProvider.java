@@ -10,9 +10,7 @@ import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
 import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactResult;
-import org.eclipse.aether.resolution.DependencyRequest;
-import org.eclipse.aether.resolution.DependencyResolutionException;
+import org.eclipse.aether.resolution.*;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
@@ -45,6 +43,16 @@ public class MavenProvider {
         locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
         system = locator.getService(RepositorySystem.class);
         session.setLocalRepositoryManager(system.newLocalRepositoryManager(session, new LocalRepository(REPO_PATH)));
+    }
+
+    public ArtifactResult resolve(Artifact artifact) {
+        ArtifactRequest request = new ArtifactRequest().setRepositories(repositoryList).setArtifact(artifact);
+        try {
+            return system.resolveArtifact(session, request);
+        } catch (ArtifactResolutionException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public List<ArtifactResult> resolveTransitively(Artifact artifact) {
