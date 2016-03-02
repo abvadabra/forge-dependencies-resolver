@@ -1,11 +1,8 @@
 package ru.redenergy.resolver;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonReader;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
@@ -14,8 +11,8 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
-import ru.redenergy.resolver.domain.Dependencies;
 import ru.redenergy.resolver.config.ResolutionCache;
+import ru.redenergy.resolver.domain.Dependencies;
 import ru.redenergy.resolver.domain.Repository;
 import ru.redenergy.resolver.domain.ResolveDSLParser;
 import ru.redenergy.resolver.maven.MavenProvider;
@@ -23,12 +20,12 @@ import ru.redenergy.resolver.maven.MavenProvider;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 public class Resolver {
 
@@ -62,20 +59,18 @@ public class Resolver {
 
     private void parseSubmodules() throws IOException {
         if(!Files.exists(Paths.get(deployFolder))) Files.createDirectory(Paths.get(deployFolder));
-        for(File module : new File(deployFolder).listFiles()){
-            if(module.isFile() && module.getName().endsWith(".zip") || module.getName().endsWith(".jar")){
-                JarFile jar = new JarFile(module);
-                JarEntry modmeta = jar.getJarEntry("dependencies.groovy");
-                if(modmeta != null) {
-                    InputStream entryStream = jar.getInputStream(modmeta);
-                    InputStreamReader streamReader = new InputStreamReader(entryStream, "UTF-8");
-                    Dependencies dependencies = (Dependencies) new ResolveDSLParser().shell().evaluate(streamReader);
-                    streamReader.close();
-                    entryStream.close();
-                    dependenciesList.add(dependencies);
-                }
-                jar.close();
+        for(File module : FileUtils.listFiles(new File(deployFolder), new String[]{"zip", "jar"}, false)){
+            JarFile jar = new JarFile(module);
+            JarEntry modmeta = jar.getJarEntry("dependencies.groovy");
+            if(modmeta != null) {
+                InputStream entryStream = jar.getInputStream(modmeta);
+                InputStreamReader streamReader = new InputStreamReader(entryStream, "UTF-8");
+                Dependencies dependencies = (Dependencies) new ResolveDSLParser().shell().evaluate(streamReader);
+                streamReader.close();
+                entryStream.close();
+                dependenciesList.add(dependencies);
             }
+            jar.close();
         }
     }
 
@@ -118,12 +113,11 @@ public class Resolver {
         String[] excludes = artifactConfig.getExcludes();
         if(excludes == null || resolvedArtifact.getArtifact() == null) return false;
         Artifact resolved = resolvedArtifact.getArtifact();
-        boolean excluded = Stream.of(excludes)
+        return Stream.of(excludes)
                 .map(DefaultArtifact::new)
                 .anyMatch(it -> it.getGroupId().equalsIgnoreCase(resolved.getGroupId()) &&
                         it.getArtifactId().equalsIgnoreCase(resolved.getArtifactId()) &&
                         it.getClassifier().equalsIgnoreCase(resolved.getClassifier()));
-        return excluded;
     }
 
     private void generateNewCache() {
@@ -163,7 +157,7 @@ public class Resolver {
     private void recreateCache() throws IOException {
         if(oldCache != null){
             File oldCacheFile = new File(deployFolder, "resolution.cache");
-            if(oldCacheFile.exists()) oldCacheFile.delete();
+            if(oldCacheFile.exists()) FileUtils.forceDelete(oldCacheFile);
         }
         File cache = new File(deployFolder, "resolution.cache");
         FileWriter writer = new FileWriter(cache);
@@ -171,25 +165,11 @@ public class Resolver {
         writer.close();
     }
 
-    private List<Dependencies> parseModMeta(JsonReader reader){
-        JsonElement json = new JsonParser().parse(reader);
-        Gson gson = new Gson();
-        return StreamSupport.stream(json.getAsJsonArray().spliterator(), false)
-                .filter(JsonElement::isJsonObject)
-                .map(JsonElement::getAsJsonObject)
-                .filter(it -> it.has("maven"))
-                .map(it -> it.getAsJsonObject("maven"))
-                .map(it -> gson.fromJson(it, Dependencies.class))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
-
     private RemoteRepository toRemote(Repository repository) {
-        String name = extractPossibleEnv(repository.getName());
-        String url = extractPossibleEnv(repository.getUrl());
-        String login = extractPossibleEnv(repository.getLogin());
-        String password = extractPossibleEnv(repository.getPassword());
+        String name = repository.getName();
+        String url = repository.getUrl();
+        String login = repository.getLogin();
+        String password = repository.getPassword();
 
         RemoteRepository.Builder remote = new RemoteRepository.Builder(name, "default", url);
         if (login != null || password != null) {
@@ -200,17 +180,6 @@ public class Resolver {
         }
         return remote.build();
     }
-
-    private String extractPossibleEnv(String value) {
-        if (value == null) return null;
-        boolean envVar = value.matches("#\\{.*\\}"); //if matches #{value}
-        if (envVar) {
-            String varName = value.substring(2, value.length() - 1);
-            return System.getenv(varName);
-        }
-        return value;
-    }
-
     public static void main(String[] args) throws IOException, DependencyResolutionException {
         new Resolver().launch();
     }

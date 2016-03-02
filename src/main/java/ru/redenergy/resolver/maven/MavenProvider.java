@@ -1,12 +1,12 @@
 package ru.redenergy.resolver.maven;
 
-import org.eclipse.aether.graph.Dependency;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.collection.CollectRequest;
 import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
+import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -18,10 +18,8 @@ import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.eclipse.aether.util.artifact.JavaScopes;
 import org.eclipse.aether.util.filter.DependencyFilterUtils;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class MavenProvider {
 
@@ -31,13 +29,12 @@ public class MavenProvider {
 
     private final List<RemoteRepository> repositoryList = new ArrayList<>();
 
-    private final DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
-
     private RepositorySystem system;
 
     private final DefaultRepositorySystemSession session = MavenRepositorySystemUtils.newSession();
 
     public MavenProvider(){
+        DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
         locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
         locator.addService(TransporterFactory.class, FileTransporterFactory.class);
         locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
