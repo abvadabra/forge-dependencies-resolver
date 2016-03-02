@@ -11,7 +11,7 @@ public class ResolveDSLParser {
     private GroovyShell constructShell(){
         CompilerConfiguration config = new CompilerConfiguration();
         ImportCustomizer importCustomizer = new ImportCustomizer();
-        importCustomizer.addImports(Repository.class.getName(), Dependencies.class.getName(), Dependencies.Artifact.class.getName());
+        importCustomizer.addImports(DomainRepository.class.getName(), Dependencies.class.getName(), DomainArtifact.class.getName());
         config.setScriptBaseClass(ResolveBaseDslScript.class.getName());
         return new GroovyShell(config);
     }

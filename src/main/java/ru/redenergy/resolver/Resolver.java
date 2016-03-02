@@ -13,7 +13,8 @@ import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
 import ru.redenergy.resolver.config.ResolutionCache;
 import ru.redenergy.resolver.domain.Dependencies;
-import ru.redenergy.resolver.domain.Repository;
+import ru.redenergy.resolver.domain.DomainArtifact;
+import ru.redenergy.resolver.domain.DomainRepository;
 import ru.redenergy.resolver.domain.ResolveDSLParser;
 import ru.redenergy.resolver.maven.MavenProvider;
 
@@ -80,13 +81,13 @@ public class Resolver {
                 .flatMap(it -> it.getRepositories().stream())
                 .map(this::toRemote)
                 .forEach(MavenProvider.instance()::addRepository);
-        List<Dependencies.Artifact> artifacts = dependenciesList.stream()
+        List<DomainArtifact> artifacts = dependenciesList.stream()
                 .filter(it -> it.getDependencies() != null)
                 .flatMap(it -> it.getDependencies().stream())
                 .collect(Collectors.toList());
 
-        List<Dependencies.Artifact> transitive = artifacts.stream().filter(Dependencies.Artifact::isTransitive).collect(Collectors.toList());
-        List<Dependencies.Artifact> nonTransitive = artifacts.stream().filter(it -> !it.isTransitive()).collect(Collectors.toList());
+        List<DomainArtifact> transitive = artifacts.stream().filter(DomainArtifact::isTransitive).collect(Collectors.toList());
+        List<DomainArtifact> nonTransitive = artifacts.stream().filter(it -> !it.isTransitive()).collect(Collectors.toList());
 
         transitive.parallelStream()
                 .map(it -> Pair.of(it, new DefaultArtifact(it.getId())))
@@ -100,7 +101,7 @@ public class Resolver {
                 .forEach(this.resolvedArtifacts::add);
 
         nonTransitive.parallelStream()
-                .map(Dependencies.Artifact::getId)
+                .map(DomainArtifact::getId)
                 .map(DefaultArtifact::new)
                 .map(MavenProvider.instance()::resolve)
                 .filter(it -> it.getArtifact().getFile() != null)
@@ -109,7 +110,7 @@ public class Resolver {
                 .forEach(this.resolvedArtifacts::add);
     }
 
-    private boolean checkExcludes(Dependencies.Artifact artifactConfig, ArtifactResult resolvedArtifact) {
+    private boolean checkExcludes(DomainArtifact artifactConfig, ArtifactResult resolvedArtifact) {
         String[] excludes = artifactConfig.getExcludes();
         if(excludes == null || resolvedArtifact.getArtifact() == null) return false;
         Artifact resolved = resolvedArtifact.getArtifact();
@@ -165,7 +166,7 @@ public class Resolver {
         writer.close();
     }
 
-    private RemoteRepository toRemote(Repository repository) {
+    private RemoteRepository toRemote(DomainRepository repository) {
         String name = repository.getName();
         String url = repository.getUrl();
         String login = repository.getLogin();

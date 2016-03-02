@@ -11,32 +11,32 @@ public abstract class ResolveBaseDslScript extends Script {
 
     Dependencies dependencies = new Dependencies();
     Object activeObject = null;
-    List<Repository> repositoryList = new ArrayList<>();
-    Repository repository = new Repository();
-    List<Dependencies.Artifact> artifactsList = new ArrayList<>();
-    Dependencies.Artifact artifact = new Dependencies.Artifact();
+    List<DomainRepository> repositoryList = new ArrayList<>();
+    DomainRepository repository = new DomainRepository();
+    List<DomainArtifact> artifactsList = new ArrayList<>();
+    DomainArtifact artifact = new DomainArtifact();
 
-    public List<Repository> repositories(Closure<List<Repository>> closure){
+    public List<DomainRepository> repositories(Closure<List<DomainRepository>> closure){
         activeObject = repositoryList;
         closure.call();
         return repositoryList;
     }
 
-    public List<Dependencies.Artifact> dependencies(Closure<List<Dependencies.Artifact>> closure){
+    public List<DomainArtifact> dependencies(Closure<List<DomainArtifact>> closure){
         activeObject = artifactsList;
         closure.call();
         return artifactsList;
     }
 
-    public Repository maven(Closure<Repository> closure){
-        repository = new Repository();
+    public DomainRepository maven(Closure<DomainRepository> closure){
+        repository = new DomainRepository();
         activeObject = repository;
         repositoryList.add(closure.call());
         return repository;
     }
 
-    public Dependencies.Artifact artifact(Closure<Dependencies.Artifact> closure){
-        artifact = new Dependencies.Artifact();
+    public DomainArtifact artifact(Closure<DomainArtifact> closure){
+        artifact = new DomainArtifact();
         activeObject = artifact;
         artifactsList.add(closure.call());
         return artifact;

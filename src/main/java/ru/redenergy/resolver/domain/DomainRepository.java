@@ -1,15 +1,15 @@
 package ru.redenergy.resolver.domain;
 
-public class Repository {
+public class DomainRepository {
     private String name;
     private String url;
 
     private String login;
     private String password;
 
-    public Repository(){}
+    public DomainRepository(){}
 
-    public Repository(String name, String url, String login, String password) {
+    public DomainRepository(String name, String url, String login, String password) {
         this.name = name;
         this.url = url;
         this.login = login;
