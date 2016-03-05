@@ -1,11 +1,11 @@
 package ru.redenergy.resolver.domain;
 
 public class DomainRepository {
-    private String name;
-    private String url;
+    private String name = "";
+    private String url = "";
 
-    private String login;
-    private String password;
+    private String login = "";
+    private String password = "";
 
     public DomainRepository(){}
 

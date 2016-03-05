@@ -1,8 +1,8 @@
 package ru.redenergy.resolver.domain;
 
 public class DomainArtifact {
-    private String id;
-    private String[] exclude;
+    private String id = "";
+    private String[] exclude = {};
     private boolean transitive = true;
 
     public String getId() {
