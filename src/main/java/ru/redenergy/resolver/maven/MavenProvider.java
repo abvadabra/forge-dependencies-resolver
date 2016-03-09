@@ -23,7 +23,7 @@ import java.util.List;
 
 public class MavenProvider {
 
-    private static final String REPO_PATH = "dependencies/";
+    private static final String REPO_PATH = System.getProperty("repositoryFolder", "dependencies/");
 
     private static MavenProvider INSTANCE;
 
