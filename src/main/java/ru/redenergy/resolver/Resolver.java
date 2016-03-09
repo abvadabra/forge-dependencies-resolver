@@ -50,7 +50,7 @@ public class Resolver {
         removeUnusedArtifacts();
         deployNewArtifacts();
         recreateCache();
-        System.out.println("WARNING: Do not remove `resolution.cache` file in mods/ directory!");
+        System.out.printf("WARNING: Do not remove `resolution.cache` file in %s directory!\n", deployFolder);
     }
 
     private void parseMainConfig() throws IOException {
