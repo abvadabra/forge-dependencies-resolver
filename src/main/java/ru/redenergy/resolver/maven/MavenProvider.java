@@ -55,7 +55,7 @@ public class MavenProvider {
     public List<ArtifactResult> resolveTransitively(Artifact artifact) {
         CollectRequest collectionRequest = new CollectRequest().setRoot(new Dependency(artifact, JavaScopes.COMPILE));
         repositoryList.forEach(collectionRequest::addRepository);
-        DependencyRequest request = new DependencyRequest(collectionRequest, DependencyFilterUtils.classpathFilter(JavaScopes.COMPILE));
+        DependencyRequest request = new DependencyRequest(collectionRequest, DependencyFilterUtils.classpathFilter(JavaScopes.COMPILE,JavaScopes.RUNTIME));
         try {
             return system.resolveDependencies(session, request).getArtifactResults();
         } catch (DependencyResolutionException e) {
